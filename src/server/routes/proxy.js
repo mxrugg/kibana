@@ -10,18 +10,18 @@ var target = url.parse(config.elasticsearch);
 var join = require('path').join;
 var logger = require('../lib/logger');
 var validateRequest = require('../lib/validateRequest');
-
+var isHttps = /^https/.test(target.protocol);
 
 // If the target is backed by an SSL and a CA is provided via the config
 // then we need to inject the CA
 var customCA;
-if (/^https/.test(target.protocol) && config.kibana.ca) {
+if (isHttps && config.kibana.ca) {
   customCA = fs.readFileSync(config.kibana.ca, 'utf8');
 }
 // Add client certificate and key if required by elasticsearch
 var clientCrt;
 var clientKey;
-if (/^https/.test(target.protocol) && config.kibana.kibana_elasticsearch_client_crt && config.kibana.kibana_elasticsearch_client_key) {
+if (isHttps && config.kibana.kibana_elasticsearch_client_crt && config.kibana.kibana_elasticsearch_client_key) {
   clientCrt = fs.readFileSync(config.kibana.kibana_elasticsearch_client_crt, 'utf8');
   clientKey = fs.readFileSync(config.kibana.kibana_elasticsearch_client_key, 'utf8');
 }
@@ -64,6 +64,11 @@ router.use(function (req, res, next) {
   // Add a slash to the end of the URL so resolve doesn't remove it.
   var path = (/\/$/.test(uri.path)) ? uri.path : uri.path + '/';
   path = url.resolve(path, '.' + req.url);
+
+  // If HTTPS, prevent duplicate pathname from being applied
+  if (isHttps) {
+    path = path.slice(path.indexOf('/', 2));
+  }
 
   if (uri.auth) {
     var auth = new Buffer(uri.auth);
